@@ -808,6 +808,21 @@ button.primary:active,.btn:active{transform:translateY(1px)}
 .online-user{position:fixed;right:18px;top:14px;z-index:1500;background:#fff;border:1px solid #dfe8f3;border-radius:999px;padding:7px 10px 7px 12px;box-shadow:0 8px 24px rgba(28,61,112,.1);display:none;align-items:center;gap:8px;font-size:12px}
 .online-user.show{display:flex}.online-dot{width:8px;height:8px;border-radius:50%;background:#22a06b}.online-user button{border:0;background:#edf3ff;border-radius:999px;padding:5px 9px;cursor:pointer}
 </style>
+<style>
+.um-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0 18px}
+.um-stat{background:#fff;border:1px solid #dfe8f3;border-radius:14px;padding:14px}
+.um-stat small{display:block;color:#6a7d91;font-weight:700;margin-bottom:6px}.um-stat b{font-size:24px;color:#173f9d}
+.um-toolbar{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:14px}
+.um-toolbar input,.um-toolbar select,.um-table input,.um-table select{width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #cfdaea;border-radius:8px;background:#fff;font:inherit}
+.um-table{font-size:12px}.um-table th{white-space:nowrap}.um-table td{vertical-align:top;min-width:110px}
+.um-table td.um-email{min-width:190px}.um-table td.um-name{min-width:160px}.um-table td.um-actions{min-width:150px}
+.um-actions-wrap{display:flex;gap:6px;flex-wrap:wrap}
+.um-mini{border:0;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer;font-size:11px}
+.um-save{background:#174bc7;color:#fff}.um-disable{background:#fff1f1;color:#a23838;border:1px solid #f0cccc}.um-enable{background:#eaf8ef;color:#187347;border:1px solid #c9ead7}
+.um-badge{display:inline-flex;padding:4px 7px;border-radius:999px;font-weight:800;font-size:10px}.um-ok{background:#eaf8ef;color:#187347}.um-warn{background:#fff4d5;color:#7a5a00}.um-off{background:#ffe8e8;color:#a23838}
+.um-note{background:#eef5ff;border:1px solid #d7e5fb;padding:11px 13px;border-radius:10px;color:#415a73;margin-bottom:12px}
+@media(max-width:1000px){.um-stats{grid-template-columns:repeat(2,1fr)}.um-toolbar{grid-template-columns:1fr 1fr}.um-toolbar .wide-search{grid-column:1/-1}}
+</style>
 </head><body><div id="authGate" class="auth-gate">
   <div class="auth-card">
     <div class="auth-brand"><div class="auth-logo">KPI</div><div><h2>Marketing KPI Command Center</h2><p style="margin:2px 0 0">IDO4IDEA · Online KPI System</p></div></div>
@@ -1249,7 +1264,7 @@ const menuGroups=[
  {title:'JD & PEOPLE',icon:'👥',items:['JD ตามระดับพนักงาน','ข้อมูลพนักงาน','Employee Dashboard','Employee Performance Report']},
  {title:'PERFORMANCE',icon:'📊',items:['กรอกผล Actual','Target vs Actual','Weighted Scorecard','Monthly Score Trend','Annual Performance Summary','Performance Explorer','YoY / QoQ Comparison','KPI Benchmark','KPI Heatmap','KPI Detail','Final Evaluation']},
  {title:'REVIEW & ACTION',icon:'⚡',items:['Weekly Review','Monthly Review','Review History','Action Center']},
- {title:'SYSTEM TOOLS',icon:'⚙️',items:['KPI Management','Bulk Edit KPI','Clone KPI Cycle','Import KPI','Dashboard Builder','Presentation Mode','Backup & Restore']}
+ {title:'SYSTEM TOOLS',icon:'⚙️',items:['User Management','KPI Management','Bulk Edit KPI','Clone KPI Cycle','Import KPI','Dashboard Builder','Presentation Mode','Backup & Restore']}
 ];
 const menus=menuGroups.flatMap(g=>g.items);let current='Home';
 function fmt(n){return Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:1})}
@@ -1288,7 +1303,7 @@ function nav(){
     <span class="nav-chevron" id="chev-${gi}">⌄</span>
    </button>
    <div class="nav-group-items" id="navgroup-${gi}">
-    ${g.items.map(m=>`<button class='nav-item ${m===current?'active':''}' onclick="current='${m}';render()">${navLabel(m)}</button>`).join('')}
+    ${g.items.filter(m=>m!=='User Management'||currentProfile?.role==='admin').map(m=>`<button class='nav-item ${m===current?'active':''}' onclick="current='${m}';render()">${navLabel(m)}</button>`).join('')}
    </div>
   </div>`).join('');
  restoreNavGroups();
@@ -1333,6 +1348,7 @@ function navLabel(m){
   'Monthly Review':'Monthly Review',
   'Review History':'Review History',
   'Action Center':'Action Center',
+  'User Management':'User Management',
   'KPI Management':'KPI Management',
   'Bulk Edit KPI':'Bulk Edit KPI',
   'Clone KPI Cycle':'Clone KPI Cycle',
@@ -2209,6 +2225,149 @@ function actions(){
  <div class='section'>${rs.length?`<div class='table-wrap'><table><thead><tr><th>KPI</th><th>Root Cause</th><th>Action</th><th>Action Owner</th><th>Due</th><th>Priority</th><th>Status</th></tr></thead><tbody>${rs.map(r=>{let overdue=r.actionDueDate&&r.actionDueDate<today&&r.ast!=='Done';return `<tr class='${overdue?'overdue-row':''}'><td>${r.kpi}<br><small>${r.employee||r.owner||''}</small></td><td>${r.cause||'-'}</td><td>${r.action}</td><td>${r.actionOwner||r.owner||'-'}</td><td>${r.actionDueDate||'-'}${overdue?'<br><span class="overdue-badge">OVERDUE</span>':''}</td><td><span class='priority ${String(r.actionPriority||'Medium').toLowerCase()}'>${r.actionPriority||'Medium'}</span></td><td>${r.ast||'To Do'}</td></tr>`}).join('')}</tbody></table></div>`:'ยังไม่มี Action'}</div>`;
 }
 
+
+
+let userAdminData={users:[],employees:[],departments:[],loaded:false};
+
+function isUserDisabled(u){
+  if(u?.active===false)return true;
+  if(!u?.banned_until)return false;
+  const d=new Date(u.banned_until);
+  return !isNaN(d)&&d.getTime()>Date.now();
+}
+function fmtDateTime(v){
+  if(!v)return '—';
+  const d=new Date(v); if(isNaN(d))return '—';
+  return d.toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'});
+}
+async function invokeUserAdmin(action,payload={}){
+  if(currentProfile?.role!=='admin')throw new Error('Admin access required');
+  const {data,error}=await db.functions.invoke('user-management',{body:{action,...payload}});
+  if(error)throw new Error(error.message||'Edge Function error');
+  if(data?.error)throw new Error(data.error);
+  return data;
+}
+function userManagementPage(){
+ if(currentProfile?.role!=='admin'){
+   return `<div class='top'><div><h1>User Management</h1><div class='label'>สำหรับ Admin เท่านั้น</div></div></div><div class='section'><div class='note'>บัญชีนี้ไม่มีสิทธิ์เข้าหน้านี้</div></div>`;
+ }
+ return `<div class='top'><div><h1>User Management</h1><div class='label'>จัดการบัญชีผู้ใช้ · Role · Department · Manager · Access Status</div></div><div><span class='pill'>ADMIN ONLY</span></div></div>
+ <div class='um-note'>ข้อมูลบัญชีมาจาก Supabase Auth ส่วน Role/โครงสร้างพนักงานมาจากฐานข้อมูล KPI กลาง การ Disable จะระงับการ Login แต่ไม่ลบประวัติ KPI</div>
+ <div id='umStats' class='um-stats'></div>
+ <div class='section'>
+   <div class='um-toolbar'>
+     <input class='wide-search' id='umSearch' oninput='renderUserManagementTable()' placeholder='ค้นหา ชื่อ / Email / ตำแหน่ง'>
+     <select id='umRoleFilter' onchange='renderUserManagementTable()'><option value=''>ทุก Role</option><option>employee</option><option>manager</option><option>management</option><option>admin</option></select>
+     <select id='umDeptFilter' onchange='renderUserManagementTable()'><option value=''>ทุก Department</option></select>
+     <select id='umStatusFilter' onchange='renderUserManagementTable()'><option value=''>ทุก Status</option><option value='active'>Active</option><option value='disabled'>Disabled</option><option value='pending'>Pending Email</option></select>
+     <button class='btn secondary' onclick='loadUserManagement(true)'>↻ Refresh</button>
+   </div>
+   <div id='umTable'><div class='note'>กำลังโหลด Users...</div></div>
+ </div>`;
+}
+async function loadUserManagement(force=false){
+ if(current!=='User Management'||currentProfile?.role!=='admin')return;
+ if(userAdminData.loaded&&!force){renderUserManagementTable();return}
+ const box=document.getElementById('umTable'); if(box)box.innerHTML="<div class='note'>กำลังโหลด Users จาก Supabase...</div>";
+ try{
+   const data=await invokeUserAdmin('list');
+   userAdminData={...data,loaded:true};
+   const df=document.getElementById('umDeptFilter');
+   if(df){
+     const currentVal=df.value;
+     df.innerHTML="<option value=''>ทุก Department</option>"+(data.departments||[]).map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+     df.value=currentVal;
+   }
+   renderUserManagementTable();
+ }catch(e){
+   if(box)box.innerHTML=`<div class='note' style='border-color:#f0cccc;background:#fff1f1;color:#9c3333'>โหลด User Management ไม่สำเร็จ: ${e.message}</div>`;
+ }
+}
+function renderUserManagementStats(users){
+ const el=document.getElementById('umStats');if(!el)return;
+ const total=users.length,active=users.filter(u=>!isUserDisabled(u)&&u.email_confirmed_at).length,
+ pending=users.filter(u=>!u.email_confirmed_at).length,admins=users.filter(u=>u.role==='admin').length;
+ el.innerHTML=`
+  <div class='um-stat'><small>Total Users</small><b>${total}</b></div>
+  <div class='um-stat'><small>Active</small><b>${active}</b></div>
+  <div class='um-stat'><small>Pending Email</small><b>${pending}</b></div>
+  <div class='um-stat'><small>Admin</small><b>${admins}</b></div>`;
+}
+function renderUserManagementTable(){
+ const box=document.getElementById('umTable');if(!box||!userAdminData.loaded)return;
+ const q=(document.getElementById('umSearch')?.value||'').toLowerCase();
+ const role=document.getElementById('umRoleFilter')?.value||'';
+ const dept=document.getElementById('umDeptFilter')?.value||'';
+ const status=document.getElementById('umStatusFilter')?.value||'';
+ const depts=userAdminData.departments||[],emps=userAdminData.employees||[];
+ const deptName=id=>depts.find(d=>d.id===id)?.name||'—';
+ const users=(userAdminData.users||[]).filter(u=>{
+   const hay=[u.full_name,u.email,u.job_title,u.employee_code,deptName(u.department_id)].join(' ').toLowerCase();
+   if(q&&!hay.includes(q))return false;
+   if(role&&u.role!==role)return false;
+   if(dept&&u.department_id!==dept)return false;
+   const disabled=isUserDisabled(u);
+   if(status==='active'&&(disabled||!u.email_confirmed_at))return false;
+   if(status==='disabled'&&!disabled)return false;
+   if(status==='pending'&&u.email_confirmed_at)return false;
+   return true;
+ });
+ renderUserManagementStats(userAdminData.users||[]);
+ if(!users.length){box.innerHTML="<div class='note'>ไม่พบ User ตามตัวกรอง</div>";return}
+ box.innerHTML=`<div class='table-wrap'><table class='um-table'><thead><tr>
+ <th>Name / Email</th><th>Role</th><th>Department</th><th>Manager</th><th>Job Title</th><th>Email</th><th>Last Login</th><th>Status</th><th>Action</th>
+ </tr></thead><tbody>${users.map(u=>{
+   const disabled=isUserDisabled(u);
+   const self=u.id===currentUser?.id;
+   return `<tr data-um-user="${u.id}">
+    <td class='um-name'><input id="um-name-${u.id}" value="${escapeHTMLAttr(u.full_name||u.display_name||'')}" placeholder="ชื่อ-นามสกุล"><div class='label' style='margin-top:5px'>${u.email||'—'}</div></td>
+    <td><select id="um-role-${u.id}">${['employee','manager','management','admin'].map(r=>`<option ${r===u.role?'selected':''}>${r}</option>`).join('')}</select></td>
+    <td><select id="um-dept-${u.id}"><option value=''>—</option>${depts.map(d=>`<option value="${d.id}" ${d.id===u.department_id?'selected':''}>${d.name}</option>`).join('')}</select></td>
+    <td><select id="um-manager-${u.id}"><option value=''>—</option>${emps.filter(e=>e.id!==u.employee_id).map(e=>`<option value="${e.id}" ${e.id===u.manager_id?'selected':''}>${e.full_name||e.name}</option>`).join('')}</select></td>
+    <td><input id="um-title-${u.id}" value="${escapeHTMLAttr(u.job_title||'')}" placeholder="Job Title"></td>
+    <td>${u.email_confirmed_at?"<span class='um-badge um-ok'>Confirmed</span>":"<span class='um-badge um-warn'>Pending</span>"}</td>
+    <td>${fmtDateTime(u.last_sign_in_at)}</td>
+    <td>${disabled?"<span class='um-badge um-off'>Disabled</span>":"<span class='um-badge um-ok'>Active</span>"}</td>
+    <td class='um-actions'><div class='um-actions-wrap'><button class='um-mini um-save' onclick="saveUserRow('${u.id}')">Save</button>
+      ${disabled?`<button class='um-mini um-enable' onclick="setUserAccess('${u.id}',true)">Enable</button>`:`<button class='um-mini um-disable' ${self?'disabled title="ปิดบัญชีตัวเองไม่ได้"':''} onclick="setUserAccess('${u.id}',false)">Disable</button>`}
+    </div></td>
+   </tr>`;
+ }).join('')}</tbody></table></div>`;
+}
+function escapeHTMLAttr(v){
+ return String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+async function saveUserRow(userId){
+ const user=(userAdminData.users||[]).find(u=>u.id===userId);if(!user)return;
+ const payload={
+   user_id:userId,
+   role:document.getElementById('um-role-'+userId)?.value||user.role,
+   full_name:document.getElementById('um-name-'+userId)?.value.trim()||user.full_name,
+   display_name:document.getElementById('um-name-'+userId)?.value.trim()||user.display_name,
+   job_title:document.getElementById('um-title-'+userId)?.value.trim()||'',
+   department_id:document.getElementById('um-dept-'+userId)?.value||null,
+   manager_id:document.getElementById('um-manager-'+userId)?.value||null
+ };
+ try{
+   await invokeUserAdmin('update',payload);
+   alert('บันทึก User สำเร็จ');
+   await loadUserManagement(true);
+   if(userId===currentUser?.id){
+     const {data:p}=await db.from('profiles').select('*').eq('user_id',currentUser.id).single();
+     if(p)currentProfile=p;
+   }
+ }catch(e){alert('บันทึกไม่สำเร็จ: '+e.message)}
+}
+async function setUserAccess(userId,enabled){
+ const u=(userAdminData.users||[]).find(x=>x.id===userId);if(!u)return;
+ const verb=enabled?'เปิดใช้งาน':'ปิดใช้งาน';
+ if(!confirm(`${verb}บัญชี ${u.email} ใช่หรือไม่?`))return;
+ try{
+   await invokeUserAdmin('set_status',{user_id:userId,enabled});
+   alert(verb+'สำเร็จ');
+   await loadUserManagement(true);
+ }catch(e){alert(verb+'ไม่สำเร็จ: '+e.message)}
+}
 
 function employeePage(){
  return `<div class='top'><div><h1>ข้อมูลพนักงาน</h1><div class='label'>รายชื่อพนักงานที่ใช้ผูก KPI และบันทึกผลการประเมิน</div></div></div>
@@ -3479,7 +3638,7 @@ button.primary:active,.btn:active{transform:translateY(1px)}
   w.document.close();
 }
 
-function render(){nav();let h=current==='Home'?homePage():current==='Manual / Start Here'?manualStartPage():current==='Dashboard'?dashboard():current==='Executive Dashboard'?executiveDashboardPage():current==='KPI Health Check'?kpiHealthCheckPage():current==='Notification Center'?notificationCenterPage():current==='Department Dashboard'?departmentDashboardPage():current==='Employee Dashboard'?employeeDashboardPage():current==='Employee Performance Report'?employeePerformanceReportPage():current==='Weighted Scorecard'?weightedScorecardPage():current==='Monthly Score Trend'?monthlyScoreTrendPage():current==='Annual Performance Summary'?annualPerformanceSummaryPage():current==='Performance Explorer'?performanceExplorerPage():current==='YoY / QoQ Comparison'?comparisonPage():current==='KPI Benchmark'?kpiBenchmarkPage():current==='KPI Heatmap'?kpiHeatmapPage():current==='KPI Detail'?kpiDetailPage():current==='Final Evaluation'?finalEvaluationPage():current==='Backup & Restore'?backupRestorePage():current==='KPI Cascade Visual'?cascadeVisualPage():current==='KPI Management'?kpiManagementPage():current==='Bulk Edit KPI'?bulkEditKpiPage():current==='Clone KPI Cycle'?cloneKpiCyclePage():current==='Import KPI'?importKpiPage():current==='Dashboard Builder'?dashboardBuilderPage():current==='Presentation Mode'?presentationModePage():current==='Auto Cascade Suggestion'?autoCascadeSuggestionPage():current==='Template Pack by Role'?templatePackByRolePage():current==='KPI Library Governance'?kpiLibraryGovernancePage():current==='KPI Directory'?directory():current==='KPI Template by Role'?roleTemplatePage():current==='KPI Template by Organization'?organizationTemplatePage():current==='KPI Template by Department'?departmentTemplatePage():current==='KPI Template by Operation'?operationTemplatePage():current==='KPI Cascade Map'?cascadeMapPage():current==='JD ตามระดับพนักงาน'?jdPage():current==='ข้อมูลพนักงาน'?employeePage():current==='หลักเกณฑ์ KPI'?principles():current==='KPI Cascade'?cascade():current==='ตั้งเป้าหมาย KPI'?form(false):current==='กรอกผล Actual'?form(true):current==='Target vs Actual'?`<div class='top'><div><h1>Target vs Actual</h1><div class='label'>Export KPI ที่บันทึกไว้เป็น Excel / Word / PDF ได้จากหน้านี้</div></div><div class='export-toolbar'><button class='btn secondary' onclick='exportKPIExcel()'>📊 Excel</button><button class='btn secondary' onclick='exportKPIWord()'>📝 Word</button><button class='btn secondary' onclick='exportKPIPDF()'>📄 PDF</button></div></div><div class='section'>${table(records)}</div>`:current==='Review History'?reviewHistoryPage():current==='Action Center'?actions():reviews(current);document.getElementById('main').innerHTML=h;if(current==='ตั้งเป้าหมาย KPI'){syncKpi();setTimeout(()=>{if(pendingPreset){let k=document.getElementById('kpi');if(k){let o=document.createElement('option');o.value=pendingPreset.kpi;o.textContent=pendingPreset.kpi;k.appendChild(o);k.value=pendingPreset.kpi}let u=document.getElementById('unit');if(u)u.value=pendingPreset.unit||'';let r=document.getElementById('reason');if(r)r.value=`${pendingPreset.level} KPI · ${pendingPreset.kpi} · Target ตัวอย่าง: ${pendingPreset.targetText}`;}},0)}if(current==='กรอกผล Actual')setTimeout(refreshEvalPeriod,0);if(current==='Performance Explorer')setTimeout(refreshExplorer,0);setTimeout(enhanceUI,0)}
+function render(){nav();let h=current==='Home'?homePage():current==='Manual / Start Here'?manualStartPage():current==='Dashboard'?dashboard():current==='Executive Dashboard'?executiveDashboardPage():current==='KPI Health Check'?kpiHealthCheckPage():current==='Notification Center'?notificationCenterPage():current==='Department Dashboard'?departmentDashboardPage():current==='Employee Dashboard'?employeeDashboardPage():current==='Employee Performance Report'?employeePerformanceReportPage():current==='Weighted Scorecard'?weightedScorecardPage():current==='Monthly Score Trend'?monthlyScoreTrendPage():current==='Annual Performance Summary'?annualPerformanceSummaryPage():current==='Performance Explorer'?performanceExplorerPage():current==='YoY / QoQ Comparison'?comparisonPage():current==='KPI Benchmark'?kpiBenchmarkPage():current==='KPI Heatmap'?kpiHeatmapPage():current==='KPI Detail'?kpiDetailPage():current==='Final Evaluation'?finalEvaluationPage():current==='User Management'?userManagementPage():current==='Backup & Restore'?backupRestorePage():current==='KPI Cascade Visual'?cascadeVisualPage():current==='KPI Management'?kpiManagementPage():current==='Bulk Edit KPI'?bulkEditKpiPage():current==='Clone KPI Cycle'?cloneKpiCyclePage():current==='Import KPI'?importKpiPage():current==='Dashboard Builder'?dashboardBuilderPage():current==='Presentation Mode'?presentationModePage():current==='Auto Cascade Suggestion'?autoCascadeSuggestionPage():current==='Template Pack by Role'?templatePackByRolePage():current==='KPI Library Governance'?kpiLibraryGovernancePage():current==='KPI Directory'?directory():current==='KPI Template by Role'?roleTemplatePage():current==='KPI Template by Organization'?organizationTemplatePage():current==='KPI Template by Department'?departmentTemplatePage():current==='KPI Template by Operation'?operationTemplatePage():current==='KPI Cascade Map'?cascadeMapPage():current==='JD ตามระดับพนักงาน'?jdPage():current==='ข้อมูลพนักงาน'?employeePage():current==='หลักเกณฑ์ KPI'?principles():current==='KPI Cascade'?cascade():current==='ตั้งเป้าหมาย KPI'?form(false):current==='กรอกผล Actual'?form(true):current==='Target vs Actual'?`<div class='top'><div><h1>Target vs Actual</h1><div class='label'>Export KPI ที่บันทึกไว้เป็น Excel / Word / PDF ได้จากหน้านี้</div></div><div class='export-toolbar'><button class='btn secondary' onclick='exportKPIExcel()'>📊 Excel</button><button class='btn secondary' onclick='exportKPIWord()'>📝 Word</button><button class='btn secondary' onclick='exportKPIPDF()'>📄 PDF</button></div></div><div class='section'>${table(records)}</div>`:current==='Review History'?reviewHistoryPage():current==='Action Center'?actions():reviews(current);document.getElementById('main').innerHTML=h;if(current==='ตั้งเป้าหมาย KPI'){syncKpi();setTimeout(()=>{if(pendingPreset){let k=document.getElementById('kpi');if(k){let o=document.createElement('option');o.value=pendingPreset.kpi;o.textContent=pendingPreset.kpi;k.appendChild(o);k.value=pendingPreset.kpi}let u=document.getElementById('unit');if(u)u.value=pendingPreset.unit||'';let r=document.getElementById('reason');if(r)r.value=`${pendingPreset.level} KPI · ${pendingPreset.kpi} · Target ตัวอย่าง: ${pendingPreset.targetText}`;}},0)}if(current==='กรอกผล Actual')setTimeout(refreshEvalPeriod,0);if(current==='Performance Explorer')setTimeout(refreshExplorer,0);if(current==='User Management')setTimeout(loadUserManagement,0);setTimeout(enhanceUI,0)}
 function syncKpi(){let c=document.getElementById('cat');if(!c)return;document.getElementById('kpi').innerHTML=categories[c.value].map(x=>`<option>${x}</option>`).join('')}
 function formValue(id,fallback=''){
  const el=document.getElementById(id);
