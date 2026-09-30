@@ -803,7 +803,7 @@ button.primary:active,.btn:active{transform:translateY(1px)}
 .auth-card input{width:100%;box-sizing:border-box;padding:12px 13px;border:1px solid #cfdbea;border-radius:10px;font:inherit}
 .auth-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
 .auth-row button{border:0;border-radius:10px;padding:12px 14px;font-weight:800;cursor:pointer}
-.auth-primary{background:#174bc7;color:#fff}.auth-secondary{background:#fff4bd;color:#5f4a00;border:1px solid #f4dc6c!important}
+.auth-primary{background:#174bc7;color:#fff}.auth-secondary{background:#fff4bd;color:#5f4a00;border:1px solid #f4dc6c!important}.auth-resend{width:100%;margin-top:10px;border:0;background:#eef4ff;color:#174bc7;border-radius:10px;padding:11px 14px;font-weight:800;cursor:pointer}
 .auth-msg{min-height:20px;margin-top:12px;font-size:13px;color:#9b3e3e}
 .online-user{position:fixed;right:18px;top:14px;z-index:1500;background:#fff;border:1px solid #dfe8f3;border-radius:999px;padding:7px 10px 7px 12px;box-shadow:0 8px 24px rgba(28,61,112,.1);display:none;align-items:center;gap:8px;font-size:12px}
 .online-user.show{display:flex}.online-dot{width:8px;height:8px;border-radius:50%;background:#22a06b}.online-user button{border:0;background:#edf3ff;border-radius:999px;padding:5px 9px;cursor:pointer}
@@ -819,6 +819,7 @@ button.primary:active,.btn:active{transform:translateY(1px)}
     <label>Password</label>
     <input id="authPassword" type="password" placeholder="อย่างน้อย 6 ตัวอักษร">
     <div class="auth-row"><button class="auth-primary" onclick="signInKpi()">เข้าสู่ระบบ</button><button class="auth-secondary" onclick="signUpKpi()">สมัครใช้งาน</button></div>
+    <button class="auth-resend" onclick="resendConfirmation()">ส่งอีเมลยืนยันอีกครั้ง</button>
     <div id="authMsg" class="auth-msg"></div>
   </div>
 </div>
@@ -1081,6 +1082,40 @@ async function signInKpi(){
  if(error){authMessage(error.message);return}
  await bootstrapOnlineSession(data.session);
 }
+
+async function resendConfirmation(){
+ const email=document.getElementById('authEmail')?.value.trim();
+ if(!email){authMessage('กรอก Email ก่อน แล้วกดส่งอีเมลยืนยันอีกครั้ง');return}
+ authMessage('กำลังส่งอีเมลยืนยันใหม่...');
+ const {error}=await db.auth.resend({
+   type:'signup',
+   email,
+   options:{emailRedirectTo:'https://marketing-kpi-command-center-cb8rscj1i-panggoh.vercel.app'}
+ });
+ if(error){
+   const msg=(error.message||'').toLowerCase();
+   if(msg.includes('rate')||msg.includes('security')) authMessage('ส่งถี่เกินไป กรุณารอสักครู่แล้วลองใหม่');
+   else authMessage('ส่งอีเมลยืนยันไม่สำเร็จ: '+error.message);
+   return;
+ }
+ authMessage('ส่งอีเมลยืนยันใหม่แล้ว กรุณาเปิดอีเมลฉบับล่าสุดเท่านั้น',true);
+}
+function handleAuthHashError(){
+ const raw=location.hash.startsWith('#')?location.hash.slice(1):location.hash;
+ if(!raw)return;
+ const p=new URLSearchParams(raw);
+ const code=p.get('error_code');
+ const desc=p.get('error_description');
+ if(code==='otp_expired' || p.get('error')==='access_denied'){
+   setAuthVisible(true);
+   authMessage('ลิงก์ยืนยันอีเมลหมดอายุหรือถูกใช้แล้ว กรุณากรอก Email แล้วกด “ส่งอีเมลยืนยันอีกครั้ง”');
+   history.replaceState(null,'',location.pathname+location.search);
+ } else if(desc){
+   setAuthVisible(true);
+   authMessage(decodeURIComponent(desc.replace(/\+/g,' ')));
+ }
+}
+
 async function signOutKpi(){await db.auth.signOut();location.reload()}
 function safeJson(s){try{return JSON.parse(s||'{}')}catch(e){return {}}}
 async function bootstrapOnlineSession(session){
@@ -1141,6 +1176,7 @@ async function loadOnlineData(){
  localStorage.setItem('mkpi_records',JSON.stringify(records));
 }
 async function initOnlineApp(){
+ handleAuthHashError();
  const {data:{session}}=await db.auth.getSession();
  if(session)await bootstrapOnlineSession(session); else {setAuthVisible(true);render()}
  db.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session)setTimeout(()=>bootstrapOnlineSession(session),0)});
