@@ -2753,6 +2753,122 @@ function cascadeVisualPage(){
  return `<div class='top'><div><h1>KPI Cascade Visual</h1><div class='label'>Organization → Department → Individual / Operation</div></div></div>
  <div class='cascade-tree'>${orgs.length?orgs.map(o=>{let ds=deps.filter(d=>d.parent===o.kpi);return `<div class='tree-org'><div class='tree-node org-node'><span>STRATEGIC</span><b>${o.kpi}</b><small>Target ${o.target} ${o.unit||''}</small></div><div class='tree-children'>${ds.length?ds.map(d=>{let kids=indiv.filter(i=>i.parent===d.kpi);return `<div class='tree-dept'><div class='tree-node dept-node'><span>TACTICAL</span><b>${d.kpi}</b><small>${d.owner||''}</small></div><div class='tree-indiv'>${kids.length?kids.map(i=>`<div class='tree-node indiv-node'><span>OPERATION</span><b>${i.kpi}</b><small>${i.employee||i.owner||''}</small></div>`).join(''):`<div class='tree-empty'>ยังไม่มี Operation KPI เชื่อม</div>`}</div></div>`}).join(''):`<div class='tree-empty'>ยังไม่มี Department KPI เชื่อม</div>`}</div></div>`}).join(''):`<div class='empty-state'>ยังไม่มี Organization KPI</div>`}</div>`;
 }
+
+function approvalBadge(r){
+ const s=r.approvalStatus||'Draft';
+ const cls=s==='Approved'?'g':s==='Submitted'?'o':s==='Rejected'?'r':'';
+ return `<span class='pill ${cls}'>${s}</span>`;
+}
+function canEditKpiOnline(){
+ return ['admin','manager'].includes(currentProfile?.role||'');
+}
+function kpiEmployeeOptions(selectedId=''){
+ return employees.map(e=>`<option value="${e.id}" ${e.id===selectedId?'selected':''}>${e.name}${e.jobTitle?' · '+e.jobTitle:''}</option>`).join('');
+}
+function editKPI(index){
+ const r=records[index];
+ if(!r)return;
+ if(!canEditKpiOnline()){alert('เฉพาะ Manager หรือ Admin เท่านั้นที่แก้ KPI ได้');return}
+ const panel=document.getElementById('editPanel');if(!panel)return;
+ panel.innerHTML=`
+ <div class='section' style='margin-top:16px'>
+   <div class='top' style='position:static;height:auto;padding:0 0 12px;border:0'>
+    <div><h1 style='font-size:18px'>Edit KPI</h1><div class='label'>แก้ข้อมูล KPI ที่บันทึกแล้ว · บันทึกลง Supabase พร้อม Change Log</div></div>
+    <button class='btn secondary' onclick="document.getElementById('editPanel').innerHTML=''">ปิด</button>
+   </div>
+   <div class='form'>
+    <label>KPI<input id='editKpiName' value="${escapeHTMLAttr(r.kpi||'')}"></label>
+    <label>Baseline<input id='editBaseline' type='number' step='any' value="${r.baseline??''}"></label>
+    <label>Target<input id='editTarget' type='number' step='any' value="${r.target??''}"></label>
+    <label>หน่วย<input id='editUnit' value="${escapeHTMLAttr(r.unit||'')}"></label>
+    <label>ทิศทาง KPI<select id='editDirection'><option value='higher' ${r.direction==='higher'?'selected':''}>Higher is better</option><option value='lower' ${r.direction==='lower'?'selected':''}>Lower is better</option><option value='equal' ${r.direction==='equal'?'selected':''}>Equal / Exact</option></select></label>
+    <label>Weight (%)<input id='editWeight' type='number' min='0' max='100' step='0.1' value="${r.weight??0}"></label>
+    ${r.level==='Organization'?'':`<label>พนักงานผู้ถูกประเมิน<select id='editEmployee'><option value=''>-- เลือกพนักงาน --</option>${kpiEmployeeOptions(r.employeeId||'')}</select></label>`}
+    <label>ปีประเมิน<input id='editCycleYear' type='number' value="${r.cycleYear||''}"></label>
+    <label>Cycle<select id='editEvaluationCycle'>${cycleOptions(r.evaluationCycle||'Annual')}</select></label>
+    <label>Deadline<input id='editDeadline' type='date' value="${r.deadline||''}"></label>
+    <label>Status<select id='editStatus'><option ${(r.kpiStatus||'Active')==='Active'?'selected':''}>Active</option><option ${r.kpiStatus==='Closed'?'selected':''}>Closed</option></select></label>
+    <label>Data Source<input id='editSource' value="${escapeHTMLAttr(r.source||'')}"></label>
+    <label>Owner / Role<input id='editOwner' value="${escapeHTMLAttr(r.owner||'')}"></label>
+    <label style='grid-column:1/-1'>เหตุผล / Objective<textarea id='editReason'>${String(r.reason||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea></label>
+   </div>
+   <div class='actions'><button class='primary' onclick='saveEditedKPI(${index})'>💾 Save Changes</button></div>
+ </div>`;
+ panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function saveEditedKPI(index){
+ const r=records[index];
+ if(!r)return;
+ if(!canEditKpiOnline()){alert('เฉพาะ Manager หรือ Admin เท่านั้นที่แก้ KPI ได้');return}
+ const employeeId=r.level==='Organization'?null:(document.getElementById('editEmployee')?.value||null);
+ if(r.level!=='Organization'&&!employeeId){alert('กรุณาเลือกพนักงานผู้ถูกประเมิน');return}
+ const payload={
+   title:(document.getElementById('editKpiName')?.value||'').trim(),
+   baseline:document.getElementById('editBaseline')?.value===''?null:Number(document.getElementById('editBaseline')?.value),
+   target:document.getElementById('editTarget')?.value===''?null:Number(document.getElementById('editTarget')?.value),
+   unit:(document.getElementById('editUnit')?.value||'').trim()||null,
+   direction:document.getElementById('editDirection')?.value||'higher',
+   weight:Number(document.getElementById('editWeight')?.value||0),
+   owner_employee_id:employeeId,
+   cycle_year:Number(document.getElementById('editCycleYear')?.value||0),
+   evaluation_cycle:document.getElementById('editEvaluationCycle')?.value||'Annual',
+   deadline:document.getElementById('editDeadline')?.value||null,
+   status:document.getElementById('editStatus')?.value||'Active',
+   data_source:(document.getElementById('editSource')?.value||'').trim()||null,
+   owner_role:(document.getElementById('editOwner')?.value||'').trim()||null,
+   objective:(document.getElementById('editReason')?.value||'').trim()||null,
+   updated_at:new Date().toISOString()
+ };
+ if(!payload.title){alert('กรุณากรอกชื่อ KPI');return}
+ if(!payload.cycle_year){alert('กรุณากรอกปีประเมิน');return}
+ if(payload.weight<0||payload.weight>100){alert('Weight ต้องอยู่ระหว่าง 0–100');return}
+
+ const before={
+   title:r.kpi,baseline:r.baseline,target:r.target,unit:r.unit,direction:r.direction,weight:r.weight,
+   owner_employee_id:r.employeeId||null,cycle_year:r.cycleYear,evaluation_cycle:r.evaluationCycle,
+   deadline:r.deadline,status:r.kpiStatus,data_source:r.source,owner_role:r.owner,objective:r.reason
+ };
+ const changed=[];
+ const compare=(label,a,b)=>{if(String(a??'')!==String(b??''))changed.push(`${label}: ${a??'—'} → ${b??'—'}`)};
+ compare('KPI',before.title,payload.title);
+ compare('Baseline',before.baseline,payload.baseline);
+ compare('Target',before.target,payload.target);
+ compare('Unit',before.unit,payload.unit);
+ compare('Direction',before.direction,payload.direction);
+ compare('Weight',before.weight,payload.weight);
+ compare('Employee',before.owner_employee_id,payload.owner_employee_id);
+ compare('Year',before.cycle_year,payload.cycle_year);
+ compare('Cycle',before.evaluation_cycle,payload.evaluation_cycle);
+ compare('Deadline',before.deadline,payload.deadline);
+ compare('Status',before.status,payload.status);
+ compare('Data Source',before.data_source,payload.data_source);
+ compare('Owner Role',before.owner_role,payload.owner_role);
+ compare('Objective',before.objective,payload.objective);
+ if(!changed.length){alert('ไม่มีข้อมูลที่เปลี่ยนแปลง');return}
+
+ const {error}=await db.from('kpis').update(payload).eq('id',r.id);
+ if(error){alert('แก้ KPI ไม่สำเร็จ: '+error.message);return}
+
+ const logRes=await db.from('kpi_change_logs').insert({
+   kpi_id:r.id,
+   change_type:'Edit KPI',
+   change_note:changed.join(' | '),
+   changed_by:currentUser.id
+ });
+ if(logRes.error)console.warn('Change log error',logRes.error);
+
+ await loadOnlineData();
+ const idx=records.findIndex(x=>x.id===r.id);
+ if(idx>=0){
+   records[idx].changeLog=[...(records[idx].changeLog||[]),{
+     type:'Edit KPI',by:currentProfile?.display_name||currentUser?.email||'User',at:new Date().toISOString(),note:changed.join(' | ')
+   }];
+ }
+ localStorage.setItem('mkpi_records',JSON.stringify(records));
+ alert('บันทึกการแก้ไข KPI แล้ว');
+ current='KPI Management';render();
+}
+
 function kpiManagementPage(){
  return `<div class='top'><div><h1>KPI Management</h1><div class='label'>Edit · Duplicate · Delete · Submit · Approve · Lock Target</div></div></div>
  <div class='section'><div class='table-wrap'><table><thead><tr><th>KPI</th><th>Level</th><th>Employee/Owner</th><th>Target</th><th>Approval</th><th>Actions</th></tr></thead><tbody>${records.map((r,i)=>`<tr><td><b>${r.kpi}</b><br><small>${r.period||''}</small></td><td>${r.level}</td><td>${r.level==='Organization'?'องค์กร':(r.employee||r.owner||'—')}</td><td>${r.target} ${r.unit||''}${r.targetLocked?'<br><small>🔒 Locked</small>':''}</td><td>${approvalBadge(r)}</td><td><div class='manage-actions'><button onclick='editKPI(${i})'>Edit</button><button onclick='duplicateKPI(${i})'>Duplicate</button><button onclick='deleteKPI(${i})'>Delete</button>${r.approvalStatus==='Draft'?`<button onclick='submitKPI(${i})'>Submit</button>`:''}${r.approvalStatus==='Submitted'?`<button class='approve' onclick='approveKPI(${i})'>Approve</button>`:''}${r.approvalStatus==='Approved'?`<button onclick='requestChange(${i})'>Unlock</button>`:''}</div></td></tr>`).join('')}</tbody></table></div></div>
